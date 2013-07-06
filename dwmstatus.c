@@ -90,27 +90,74 @@ loadavg(void)
 	return smprintf("%.2f %.2f %.2f", avgs[0], avgs[1], avgs[2]);
 }
 
+char*
+runcmd(char* cmd)
+{
+	FILE* fp = popen(cmd, "r");
+	if (fp == NULL) return NULL;
+	char ln[30];
+	fgets(ln, sizeof(ln)-1, fp);
+	pclose(fp);
+	ln[strlen(ln)-1]='\0';
+	return smprintf("%s", ln);
+}
+
+int
+getvolume()
+{
+	int volume;
+        sscanf(runcmd("amixer get Master | grep 'Mono: Playback'\
+			| grep -o '[0-9%]*%'"), "%i%%", &volume);
+	return volume;
+}
+
+char*
+mkprogressbar(unsigned int size, unsigned int percent)
+{
+	unsigned int num = ((size-2)*percent)/100;
+	char *bar = malloc(size+1);
+	if (bar == NULL) {
+		perror("malloc");
+		exit(1);
+	}
+	bar[0] = '[';
+	for (int i = 1; i < num+1; i++) {
+	      bar[i] = '*';
+	}
+	for (int i = num+1; i < size-1; i++) {
+	      bar[i] = ' ';
+	}
+	bar[size-1] = ']';
+	bar[size] = '\0';
+	return bar;
+}
+
 int
 main(void)
 {
 	char *status;
 	char *avgs;
 	char *tmmx;
+	int  vol;
+	char *volbar;
 
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
 		return 1;
 	}
 
-	for (;;sleep(1)) {
+	while(1) {
 		avgs = loadavg();
 		tmmx = mktimes("WN %W %a %d %b %H:%M:%S %Z", tzmexico);
+		vol = getvolume();
+		volbar = mkprogressbar(20, vol);
 
-		status = smprintf("%s :: %s",
-				tmmx, avgs);
+		status = smprintf("%s :: %s :: %i%% %s",
+				  tmmx, avgs, vol, volbar);
 		setstatus(status);
 		free(avgs);
 		free(tmmx);
+		free(volbar);
 		free(status);
 	}
 
