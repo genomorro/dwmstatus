@@ -1,4 +1,4 @@
-#define _BSD_SOURCE
+#define _POSIX_SOURCE
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +11,10 @@
 #include <sys/wait.h>
 
 #include <X11/Xlib.h>
+
+#include <alsa/asoundlib.h>
+
+#define VOL_CH   "Master"
 
 char *tzmexico = "Mexico/General";
 
@@ -81,7 +85,7 @@ char *
 loadavg(void)
 {
 	double avgs[3];
-
+	
 	if (getloadavg(avgs, 3) < 0) {
 		perror("getloadavg");
 		exit(1);
@@ -90,25 +94,40 @@ loadavg(void)
 	return smprintf("%.2f %.2f %.2f", avgs[0], avgs[1], avgs[2]);
 }
 
-char*
-runcmd(char* cmd)
+int getvolume()
 {
-	FILE* fp = popen(cmd, "r");
-	if (fp == NULL) return NULL;
-	char ln[30];
-	fgets(ln, sizeof(ln)-1, fp);
-	pclose(fp);
-	ln[strlen(ln)-1]='\0';
-	return smprintf("%s", ln);
-}
+	long vol = 0, max = 0, min = 0;
+	int mute = 0, realvol = 0;
+	
+	snd_mixer_t *handle;
+	snd_mixer_elem_t *pcm_mixer, *mas_mixer;
+	snd_mixer_selem_id_t *vol_info, *mute_info;
 
-int
-getvolume()
-{
-	int volume;
-        sscanf(runcmd("amixer get Master | grep 'Mono: Playback'\
-			| grep -o '[0-9%]*%'"), "%i%%", &volume);
-	return volume;
+	snd_mixer_open(&handle, 0);
+	snd_mixer_attach(handle, "default");
+	snd_mixer_selem_register(handle, NULL, NULL);
+	snd_mixer_load(handle);
+	snd_mixer_selem_id_malloc(&vol_info);
+	snd_mixer_selem_id_malloc(&mute_info);
+	snd_mixer_selem_id_set_name(vol_info, VOL_CH);
+	snd_mixer_selem_id_set_name(mute_info, VOL_CH);
+	pcm_mixer = snd_mixer_find_selem(handle, vol_info);
+	mas_mixer = snd_mixer_find_selem(handle, mute_info);
+	snd_mixer_selem_get_playback_volume_range((snd_mixer_elem_t *)pcm_mixer, &min, &max);
+	snd_mixer_selem_get_playback_volume((snd_mixer_elem_t *)pcm_mixer, SND_MIXER_SCHN_MONO, &vol);
+	snd_mixer_selem_get_playback_switch(mas_mixer, SND_MIXER_SCHN_MONO, &mute);
+	if (!mute)
+           	realvol = 0;
+	else {
+		realvol = (vol * 100) / max;
+	}
+	if (vol_info)
+		snd_mixer_selem_id_free(vol_info);
+	if (mute_info)
+		snd_mixer_selem_id_free(mute_info);
+	if (handle)
+		snd_mixer_close(handle);
+	return realvol;
 }
 
 char*
@@ -120,14 +139,14 @@ mkprogressbar(unsigned int size, unsigned int percent)
 		perror("malloc");
 		exit(1);
 	}
-	bar[0] = '[';
+	bar[0] = '|';
 	for (int i = 1; i < num+1; i++) {
-	      bar[i] = '*';
+	      bar[i] = '+';
 	}
 	for (int i = num+1; i < size-1; i++) {
-	      bar[i] = ' ';
+	      bar[i] = '_';
 	}
-	bar[size-1] = ']';
+	bar[size-1] = '|';
 	bar[size] = '\0';
 	return bar;
 }
@@ -165,4 +184,3 @@ main(void)
 
 	return 0;
 }
-
