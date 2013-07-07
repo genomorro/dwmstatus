@@ -14,7 +14,8 @@
 
 #include <alsa/asoundlib.h>
 
-#define VOL_CH   "Master"
+#define VOL_CH          "Master"
+#define SOUNDCARD       "default"
 
 char *tzmexico = "Mexico/General";
 
@@ -104,7 +105,7 @@ int getvolume()
 	snd_mixer_selem_id_t *vol_info, *mute_info;
 
 	snd_mixer_open(&handle, 0);
-	snd_mixer_attach(handle, "default");
+	snd_mixer_attach(handle, SOUNDCARD);
 	snd_mixer_selem_register(handle, NULL, NULL);
 	snd_mixer_load(handle);
 	snd_mixer_selem_id_malloc(&vol_info);
