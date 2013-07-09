@@ -14,8 +14,16 @@
 
 #include <alsa/asoundlib.h>
 
+#include <sys/sysinfo.h>
+
 #define VOL_CH          "Master"
 #define SOUNDCARD       "default"
+
+#define BATT_NOW        "/sys/class/power_supply/BAT0/energy_now"
+#define BATT_FULL       "/sys/class/power_supply/BAT0/energy_full"
+#define BATT_STATUS     "/sys/class/power_supply/BAT0/status"
+
+#define MEGABYTE        1048576
 
 char *tzmexico = "Mexico/General";
 
@@ -131,6 +139,33 @@ int getvolume()
 	return realvol;
 }
 
+char *
+getbattery()
+{
+    long current, full = 0;
+    char *status = malloc(sizeof(char)*12);
+    char s = '?';
+    FILE *fp = NULL;
+    if ((fp = fopen(BATT_NOW, "r"))) {
+        fscanf(fp, "%ld\n", &current);
+        fclose(fp);
+        fp = fopen(BATT_FULL, "r");
+        fscanf(fp, "%ld\n", &full);
+        fclose(fp);
+        fp = fopen(BATT_STATUS, "r");
+        fscanf(fp, "%s\n", status);
+        fclose(fp);
+        if (strcmp(status,"Charging") == 0)
+            s = '+';
+        if (strcmp(status,"Discharging") == 0)
+            s = '-';
+        if (strcmp(status,"Full") == 0)
+            s = '=';
+        return smprintf("%c%ld%%", s,(current/(full/100)));
+    }
+    else return smprintf("");
+}
+
 char*
 mkprogressbar(unsigned int size, unsigned int percent)
 {
@@ -153,13 +188,28 @@ mkprogressbar(unsigned int size, unsigned int percent)
 }
 
 int
+usedram()
+{
+  struct sysinfo info;
+
+  if(sysinfo(&info) != 0)
+    perror("sysinfo");
+  int used = (info.totalram - info.freeram)/MEGABYTE;
+
+  return used;
+}
+
+int
 main(void)
 {
 	char *status;
 	char *avgs;
 	char *tmmx;
-	int  vol;
 	char *volbar;
+	char *bat;
+	int  uram;
+	int  vol;
+
 
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
@@ -171,13 +221,16 @@ main(void)
 		tmmx = mktimes("WN %W %a %d %b %H:%M:%S %Z", tzmexico);
 		vol = getvolume();
 		volbar = mkprogressbar(20, vol);
+		bat = getbattery();
+		uram = usedram();
 
-		status = smprintf("%s :: %s :: %i%% %s",
-				  tmmx, avgs, vol, volbar);
+		status = smprintf("%s :: %s :: %s :: %i%% %s :: %iMB",
+				  tmmx, bat, avgs, vol, volbar, uram);
 		setstatus(status);
 		free(avgs);
 		free(tmmx);
 		free(volbar);
+		free(bat);
 		free(status);
 	}
 
