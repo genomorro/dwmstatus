@@ -9,6 +9,9 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <mntent.h>
+#include <regex.h>
+#include <sys/statvfs.h>
 
 #include <X11/Xlib.h>
 
@@ -24,6 +27,8 @@
 #define BATT_STATUS     "/sys/class/power_supply/BAT0/status"
 
 #define MEGABYTE        1048576
+
+#define MAX_ERROR_MSG   0x1000
 
 char *tzmexico = "Mexico/General";
 
@@ -51,6 +56,35 @@ smprintf(char *fmt, ...)
 	va_end(fmtargs);
 
 	return ret;
+}
+
+static int
+compile_regex (regex_t *r, const char *regex_text)
+{
+    int status = regcomp (r, regex_text, REG_EXTENDED|REG_NEWLINE);
+    if (status != 0) {
+	char error_message[MAX_ERROR_MSG];
+	regerror (status, r, error_message, MAX_ERROR_MSG);
+        printf ("Regex error compiling '%s': %s\n",
+                 regex_text, error_message);
+        return 1;
+    }
+    return 0;
+}
+
+static int
+match_regex (regex_t *r, const char *to_match)
+{
+  const char *p = to_match;
+  const int n_matches = 1;
+  regmatch_t m[n_matches];
+
+  int nomatch = regexec (r, p, n_matches, m, 0);
+  if (nomatch) {
+    return nomatch;
+  } else {
+    return 0;
+  }
 }
 
 void
@@ -199,6 +233,66 @@ usedram()
   return used;
 }
 
+char *
+freespace(char *mntpt)
+{
+  struct statvfs data;
+  double total, used = 0;
+  int ctotal, cused = 0;
+  const char unit[] = { 'k', 'M', 'G', 'T' };
+
+  if ( (statvfs(mntpt, &data)) < 0){
+    fprintf(stderr, "can't get info on disk.\n");
+    return("?");
+  }
+  total = (data.f_blocks * data.f_frsize);
+  used = ((data.f_blocks - data.f_bfree) * data.f_frsize) ;
+  while(total > 1024) {
+    total/=1024;
+    ctotal++;
+  }
+  while(used > 1024) {
+    used/=1024;
+    cused++;
+  }
+  return(smprintf("%.2f%c %.1f%c", total, unit[ctotal-1], used, unit[cused-1]));
+}
+
+char *
+getmounted()
+{
+  struct mntent *ent = NULL;
+  FILE *mtab = NULL;
+  char *free;
+  char buf[1024];
+
+  regex_t r;
+  const char * regex_text;
+  const char * find_text;
+
+  regex_text = "(/media|/mnt)";
+
+  strcpy(buf," ::");
+  
+  compile_regex(&r, regex_text);
+
+  if ((mtab = setmntent("/etc/mtab", "r")) != NULL) {
+    while ((ent = getmntent(mtab)) != NULL) {
+      if ((ent->mnt_fsname  != NULL)) {
+	find_text = ent->mnt_dir;
+	if ((match_regex(&r, find_text)) == 0) {
+	  strcat(buf," ");
+	  strcat(buf,ent->mnt_dir);
+	  strcat(buf," ");
+	  strcat(buf,free = freespace(ent->mnt_dir));
+	}
+      }
+    }
+    endmntent(mtab);
+  }
+  return smprintf ("%s",buf);
+}
+
 int
 main(void)
 {
@@ -209,7 +303,7 @@ main(void)
 	char *bat;
 	int  uram;
 	int  vol;
-
+	char *mnt;
 
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
@@ -223,15 +317,18 @@ main(void)
 		volbar = mkprogressbar(20, vol);
 		bat = getbattery();
 		uram = usedram();
+		mnt = getmounted();
 
-		status = smprintf("%s :: %s :: %s :: %i%% %s :: %iMB",
-				  tmmx, bat, avgs, vol, volbar, uram);
+		status = smprintf("%s :: %s :: %s :: %i%% %s :: %iMB %s",
+				  tmmx, bat, avgs, vol, volbar, uram, mnt);
 		setstatus(status);
 		free(avgs);
 		free(tmmx);
 		free(volbar);
 		free(bat);
+		free(mnt);
 		free(status);
+		sleep(1);
 	}
 
 	XCloseDisplay(dpy);
