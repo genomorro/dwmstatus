@@ -26,8 +26,6 @@
 #define BATT_FULL       "/sys/class/power_supply/BAT0/energy_full"
 #define BATT_STATUS     "/sys/class/power_supply/BAT0/status"
 
-#define MEGABYTE        1048576
-
 #define MAX_ERROR_MSG   0x1000
 
 char *tzmexico = "Mexico/General";
@@ -221,16 +219,21 @@ mkprogressbar(unsigned int size, unsigned int percent)
 	return bar;
 }
 
-int
+char *
 usedram()
 {
   struct sysinfo info;
+  int cused = 0;
+  const char unit[] = { 'k', 'M', 'G', 'T' };
 
   if(sysinfo(&info) != 0)
     perror("sysinfo");
-  int used = (info.totalram - info.freeram)/MEGABYTE;
-
-  return used;
+  double used = (info.totalram - info.freeram);
+  while(used > 1024) {
+    used/=1024;
+    cused++;
+  }
+  return(smprintf("%.2f%c", used, unit[cused-1]));
 }
 
 char *
@@ -255,7 +258,7 @@ freespace(char *mntpt)
     used/=1024;
     cused++;
   }
-  return(smprintf("%.2f%c %.1f%c", total, unit[ctotal-1], used, unit[cused-1]));
+  return(smprintf("%.2f%c %.2f%c", total, unit[ctotal-1], used, unit[cused-1]));
 }
 
 char *
@@ -301,7 +304,7 @@ main(void)
 	char *tmmx;
 	char *volbar;
 	char *bat;
-	int  uram;
+	char *uram;
 	int  vol;
 	char *mnt;
 
@@ -319,13 +322,14 @@ main(void)
 		uram = usedram();
 		mnt = getmounted();
 
-		status = smprintf("%s :: %s :: %s :: %i%% %s :: %iMB %s",
+		status = smprintf("%s :: %s :: %s :: %i%% %s :: %s %s",
 				  tmmx, bat, avgs, vol, volbar, uram, mnt);
 		setstatus(status);
 		free(avgs);
 		free(tmmx);
 		free(volbar);
 		free(bat);
+		free(uram);
 		free(mnt);
 		free(status);
 		sleep(1);
