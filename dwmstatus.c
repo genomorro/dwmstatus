@@ -67,6 +67,7 @@ compile_regex (regex_t *r, const char *regex_text)
                  regex_text, error_message);
         return 1;
     }
+ /* TODO: regfree(r); violacion de segmento */
     return 0;
 }
 
@@ -288,6 +289,7 @@ getmounted()
 	  strcat(buf,ent->mnt_dir);
 	  strcat(buf," ");
 	  strcat(buf,free = freespace(ent->mnt_dir));
+	  regfree(&r);
 	}
       }
     }
