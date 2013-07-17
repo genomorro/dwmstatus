@@ -1,32 +1,27 @@
 #define _POSIX_SOURCE
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <strings.h>
-#include <sys/time.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/wait.h>
+#include <X11/Xlib.h>
+#include <alsa/asoundlib.h>
 #include <mntent.h>
 #include <regex.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 #include <sys/statvfs.h>
-
-#include <X11/Xlib.h>
-
-#include <alsa/asoundlib.h>
-
 #include <sys/sysinfo.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 
-#define VOL_CH          "Master"
-#define SOUNDCARD       "default"
-
-#define BATT_NOW        "/sys/class/power_supply/BAT0/energy_now"
 #define BATT_FULL       "/sys/class/power_supply/BAT0/energy_full"
+#define BATT_NOW        "/sys/class/power_supply/BAT0/energy_now"
 #define BATT_STATUS     "/sys/class/power_supply/BAT0/status"
-
 #define MAX_ERROR_MSG   0x1000
+#define SOUNDCARD       "default"
+#define VOL_CH          "Master"
 
 char *tzmexico = "Mexico/General";
 
@@ -38,7 +33,6 @@ smprintf(char *fmt, ...)
 	va_list fmtargs;
 	char *ret;
 	int len;
-
 	va_start(fmtargs, fmt);
 	len = vsnprintf(NULL, 0, fmt, fmtargs);
 	va_end(fmtargs);
@@ -48,11 +42,9 @@ smprintf(char *fmt, ...)
 		perror("malloc");
 		exit(1);
 	}
-
 	va_start(fmtargs, fmt);
 	vsnprintf(ret, len, fmt, fmtargs);
 	va_end(fmtargs);
-
 	return ret;
 }
 
@@ -67,7 +59,6 @@ compile_regex (regex_t *r, const char *regex_text)
                  regex_text, error_message);
         return 1;
     }
- /* TODO: regfree(r); violacion de segmento */
     return 0;
 }
 
@@ -77,7 +68,6 @@ match_regex (regex_t *r, const char *to_match)
   const char *p = to_match;
   const int n_matches = 1;
   regmatch_t m[n_matches];
-
   int nomatch = regexec (r, p, n_matches, m, 0);
   if (nomatch) {
     return nomatch;
@@ -98,7 +88,6 @@ mktimes(char *fmt, char *tzname)
 	char buf[129];
 	time_t tim;
 	struct tm *timtm;
-
 	memset(buf, 0, sizeof(buf));
 	settz(tzname);
 	tim = time(NULL);
@@ -112,7 +101,6 @@ mktimes(char *fmt, char *tzname)
 		fprintf(stderr, "strftime == 0\n");
 		exit(1);
 	}
-
 	return smprintf("%s", buf);
 }
 
@@ -132,19 +120,17 @@ loadavg(void)
 		perror("getloadavg");
 		exit(1);
 	}
-
 	return smprintf("%.2f %.2f %.2f", avgs[0], avgs[1], avgs[2]);
 }
 
-int getvolume()
+int
+getvolume()
 {
 	long vol = 0, max = 0, min = 0;
 	int mute = 0, realvol = 0;
-	
 	snd_mixer_t *handle;
 	snd_mixer_elem_t *pcm_mixer, *mas_mixer;
 	snd_mixer_selem_id_t *vol_info, *mute_info;
-
 	snd_mixer_open(&handle, 0);
 	snd_mixer_attach(handle, SOUNDCARD);
 	snd_mixer_selem_register(handle, NULL, NULL);
@@ -226,7 +212,6 @@ usedram()
   struct sysinfo info;
   int cused = 0;
   const char unit[] = { 'k', 'M', 'G', 'T' };
-
   if(sysinfo(&info) != 0)
     perror("sysinfo");
   double used = (info.totalram - info.freeram);
@@ -244,7 +229,6 @@ freespace(char *mntpt)
   double total, used = 0;
   int ctotal, cused = 0;
   const char unit[] = { 'k', 'M', 'G', 'T' };
-
   if ( (statvfs(mntpt, &data)) < 0){
     fprintf(stderr, "can't get info on disk.\n");
     return("?");
@@ -269,17 +253,12 @@ getmounted()
   FILE *mtab = NULL;
   char *free;
   char buf[1024];
-
   regex_t r;
   const char * regex_text;
   const char * find_text;
-
   regex_text = "(/media|/mnt)";
-
   strcpy(buf," ::");
-  
   compile_regex(&r, regex_text);
-
   if ((mtab = setmntent("/etc/mtab", "r")) != NULL) {
     while ((ent = getmntent(mtab)) != NULL) {
       if ((ent->mnt_fsname  != NULL)) {
@@ -299,45 +278,40 @@ getmounted()
 }
 
 int
-main(void)
+main(int argc, char *argv[])
 {
-	char *status;
 	char *avgs;
-	char *tmmx;
-	char *volbar;
 	char *bat;
-	char *uram;
-	int  vol;
 	char *mnt;
-
+	char *status;
+	char *tmmx;
+	char *uram;
+	char *volbar;
+	int  vol;
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
 		return 1;
 	}
-
 	while(1) {
 		avgs = loadavg();
-		tmmx = mktimes("WN %W %a %d %b %H:%M:%S %Z", tzmexico);
+		bat = getbattery();
+		mnt = getmounted();
+		tmmx = mktimes("%a %d %b %H:%M:%S", tzmexico);
+		uram = usedram();
 		vol = getvolume();
 		volbar = mkprogressbar(20, vol);
-		bat = getbattery();
-		uram = usedram();
-		mnt = getmounted();
-
-		status = smprintf("%s :: %s :: %s :: %i%% %s :: %s %s",
-				  tmmx, bat, avgs, vol, volbar, uram, mnt);
+		status = smprintf("%s | %s | %s | %s | %i%% %s %s",
+				  tmmx, avgs, bat, uram, vol, volbar, mnt);
 		setstatus(status);
 		free(avgs);
-		free(tmmx);
-		free(volbar);
 		free(bat);
-		free(uram);
 		free(mnt);
 		free(status);
+		free(tmmx);
+		free(uram);
+		free(volbar);
 		sleep(1);
 	}
-
 	XCloseDisplay(dpy);
-
 	return 0;
 }
