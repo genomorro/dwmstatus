@@ -1,6 +1,5 @@
 #define _POSIX_SOURCE
 #include <X11/Xlib.h>
-#include <alsa/asoundlib.h>
 #include <mntent.h>
 #include <regex.h>
 #include <stdarg.h>
@@ -15,6 +14,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <alsa/asoundlib.h>
 
 #define BATT_FULL       "/sys/class/power_supply/BAT0/energy_full"
 #define BATT_NOW        "/sys/class/power_supply/BAT0/energy_now"
@@ -194,14 +194,14 @@ mkprogressbar(unsigned int size, unsigned int percent)
 		perror("malloc");
 		exit(1);
 	}
-	bar[0] = '|';
+	bar[0] = '[';
 	for (int i = 1; i < num+1; i++) {
 	      bar[i] = '+';
 	}
 	for (int i = num+1; i < size-1; i++) {
-	      bar[i] = '_';
+	      bar[i] = ' ';
 	}
-	bar[size-1] = '|';
+	bar[size-1] = ']';
 	bar[size] = '\0';
 	return bar;
 }
@@ -257,7 +257,7 @@ getmounted()
   const char * regex_text;
   const char * find_text;
   regex_text = "(/media|/mnt)";
-  strcpy(buf," ::");
+  strcpy(buf,"");
   compile_regex(&r, regex_text);
   if ((mtab = setmntent("/etc/mtab", "r")) != NULL) {
     while ((ent = getmntent(mtab)) != NULL) {

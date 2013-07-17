@@ -1,5 +1,5 @@
 NAME = dwmstatus
-VERSION = 1.2
+VERSION = 2.0
 
 # Customize below to fit your system
 
