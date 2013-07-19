@@ -88,7 +88,7 @@ freespace(char *mntpt)
     used/=1024;
     cused++;
   }
-  return(smprintf("%.2f%c %.1f%c", total, unit[ctotal-1], used, unit[cused-1]));
+  return(smprintf("%.2f%c %.2f%c", total, unit[ctotal-1], used, unit[cused-1]));
 }
 
 char *
@@ -103,9 +103,9 @@ getmounted()
   const char * regex_text;
   const char * find_text;
 
-  regex_text = "(/media|/mnt)";
+  regex_text = "(/media/|/mnt/)";
 
-  strcpy(buf," ::");
+  strcpy(buf,"");
   
   compile_regex(&r, regex_text);
 
@@ -121,6 +121,7 @@ getmounted()
 	}
       }
     }
+    regfree(&r);
     endmntent(mtab);
   }
   return smprintf ("%s",buf);
