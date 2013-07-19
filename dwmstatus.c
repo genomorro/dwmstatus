@@ -256,7 +256,7 @@ getmounted()
   regex_t r;
   const char * regex_text;
   const char * find_text;
-  regex_text = "(/media|/mnt)";
+  regex_text = "(/media/|/mnt/)";
   strcpy(buf,"");
   compile_regex(&r, regex_text);
   if ((mtab = setmntent("/etc/mtab", "r")) != NULL) {
@@ -268,10 +268,10 @@ getmounted()
 	  strcat(buf,ent->mnt_dir);
 	  strcat(buf," ");
 	  strcat(buf,free = freespace(ent->mnt_dir));
-	  regfree(&r);
 	}
       }
     }
+    regfree(&r);
     endmntent(mtab);
   }
   return smprintf ("%s",buf);
