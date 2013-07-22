@@ -18,4 +18,5 @@ These codes have heen very helpful:
 
 TODO:
 
-* Memory function should subtract cached and buffers memory but sysinfo cannot get cache memory.
+* DONE Memory function should subtract cached and buffers memory but sysinfo cannot get cache memory.
+* Is it use lots CPU?
