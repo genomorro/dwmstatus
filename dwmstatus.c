@@ -206,20 +206,36 @@ mkprogressbar(unsigned int size, unsigned int percent)
 	return bar;
 }
 
+int
+meminfo(char *param)
+{
+  int mem;
+  char line[256];
+  FILE *meminfo = fopen("/proc/meminfo", "r");
+  while(fgets(line, sizeof(line), meminfo)) {
+    if(sscanf(line, param, &mem) == 1) {
+      fclose(meminfo);
+      return mem;
+    }
+  }
+  fclose(meminfo);
+  return -1;
+}
+
 char *
-usedram()
+usedmem()
 {
   struct sysinfo info;
   int cused = 0;
   const char unit[] = { 'k', 'M', 'G', 'T' };
   if(sysinfo(&info) != 0)
     perror("sysinfo");
-  double used = (info.totalram - info.freeram);
+  double used = (((info.totalram - info.freeram - info.bufferram)/1024) - meminfo("Cached: %d kB"));
   while(used > 1024) {
     used/=1024;
     cused++;
   }
-  return(smprintf("%.2f%c", used, unit[cused-1]));
+  return(smprintf("%.2f%c", used, unit[cused]));
 }
 
 char *
@@ -297,7 +313,7 @@ main(int argc, char *argv[])
 		bat = getbattery();
 		mnt = getmounted();
 		tmmx = mktimes("%a %d %b %H:%M:%S", tzmexico);
-		uram = usedram();
+		uram = usedmem();
 		vol = getvolume();
 		volbar = mkprogressbar(20, vol);
 		status = smprintf("%s | %s | %s | %s | %i%% %s %s",

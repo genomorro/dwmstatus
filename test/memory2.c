@@ -8,17 +8,13 @@ int main( int argc, char **argv )
   struct sysinfo info;
   sysinfo(&info);
 
-  int used = (info.totalram - info.freeram)/MEGABYTE ;
-  
-  printf ("Used Ram: %i\n", used);
-
-  /* printf ("Total ram: %d\n",(long)info.totalram/MEGABYTE );      */
-  /* printf ("Free ram: %d\n", (long)info.freeram/MEGABYTE ); */
-  /* printf ("Mem unit %d\n",(long)info.mem_unit ); */
-  /* printf ("Shared: %d\n", (long)info.sharedram/MEGABYTE ); */
-  /* printf ("Buffered: %d\n",(long)info.bufferram/MEGABYTE ); */
-  /* printf ("Total High: %d\n",(long)info.totalhigh/MEGABYTE ); */
-  /* printf ("Free high: %d\n",(long)info.freehigh/MEGABYTE ); */
+  printf ("Total ram: %d\n",(long)info.totalram/MEGABYTE );
+  printf ("Free ram: %d\n", (long)info.freeram/MEGABYTE );
+  printf ("Mem unit %d\n",(long)info.mem_unit );
+  printf ("Shared: %d\n", (long)info.sharedram/MEGABYTE );
+  printf ("Buffered: %d\n",(long)info.bufferram/MEGABYTE );
+  printf ("Total High: %d\n",(long)info.totalhigh/MEGABYTE );
+  printf ("Free high: %d\n",(long)info.freehigh/MEGABYTE );
      
   return 0;
 }
